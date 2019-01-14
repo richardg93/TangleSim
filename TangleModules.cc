@@ -9,7 +9,6 @@ using namespace omnetpp;
 enum MessageType { NEXT_TX_TIMER, POW_TIMER, TIP_REQUEST, ATTACH_CONFIRM };
 
 
-
 std::vector<t_ptrTx> tracker;
 
 
@@ -19,109 +18,118 @@ std::vector<t_ptrTx> tracker;
  * request from the Tangle module before attaching
  */
 
-class TxActorModule : public cSimpleModule {
+class TxActorModule : public cSimpleModule
+{
 
 private:
     int issueCount;
     TxActor self; // non omnetpp implmentation of transactor
     simtime_t powTime;
 
-
-
 protected:
     virtual void initialize() override;
-    virtual void handleMessage(cMessage * msg) override;
+    virtual void handleMessage( cMessage * msg ) override;
+
 public:
     std::vector<t_ptrTx> actorTipView; // tips sent by tangle are stored by transactor till they can approve some
     simtime_t tipTime; //time our tips view is from
-};
-
-Define_Module(TxActorModule);
-
-
-class TangleModule : public cSimpleModule {
-
-private:
-    int txCount;
-    int txLimit;
-    Tangle tn;
-
-
-protected:
-    virtual void initialize() override;
-    virtual void handleMessage(cMessage * msg) override;
 
 };
 
-Define_Module(TangleModule);
+
+Define_Module( TxActorModule );
 
 
-void TxActorModule::initialize() {
+class TangleModule : public cSimpleModule
+{
 
-    cMessage * timer = new cMessage("nextTxTimer", NEXT_TX_TIMER );
-    scheduleAt(simTime() + par("txGenRate"), timer);
+    private:
+        int txCount;
+        int txLimit;
+        Tangle tn;
+
+    protected:
+        virtual void initialize() override;
+        virtual void handleMessage( cMessage * msg ) override;
+
+};
+
+
+Define_Module( TangleModule );
+
+
+void TxActorModule::initialize()
+{
+
+    cMessage * timer = new cMessage( "nextTxTimer", NEXT_TX_TIMER );
+    scheduleAt( simTime() + par( "txGenRate" ), timer );
     EV_DEBUG << "Starting next transaction procedure" << std::endl;
-    powTime = par("powTime");
+    powTime = par( "powTime" );
 
 }
 
-void TxActorModule::handleMessage(cMessage * msg) {
+
+void TxActorModule::handleMessage(cMessage * msg)
+{
 
     if( msg->isSelfMessage() ){
 
-        if( msg->getKind() == NEXT_TX_TIMER ) { //SELF MESSAGE TO START TRANSACTION PROCEDURE AGAIN
+        if( msg->getKind() == NEXT_TX_TIMER )
+        { //SELF MESSAGE TO START TRANSACTION PROCEDURE AGAIN
 
             delete msg;
             //send request to tangle for tips
 
             EV_DEBUG << "TxActor " << getId() << ": requesting tips from tangle" << std::endl;
-            cMessage * tipRequest = new cMessage("tipRequest", TIP_REQUEST);
-            send(tipRequest, "tangleConnect$o");
+            cMessage * tipRequest = new cMessage( "tipRequest", TIP_REQUEST );
+            send( tipRequest, "tangleConnect$o" );
 
-
-
-        } else { //POW_TIMER
+        }
+        else
+        { //POW_TIMER
 
             EV_DEBUG << "TxActor " << getId() << ": POW completed, approving tips" << std::endl;
             issueCount++;
             delete msg;
             //store number of tips seen by transaction before and add to confirmation message
 
-
             EV_DEBUG << "Tips seen before starting POW: " << actorTipView.size() << std::endl;
-
 
             /*
              * WALK TIP SELECTION TESTING CODE
              */
 
-            t_ptrTx testTx = self.getWalkStart( actorTipView, par("walkDepth") );
-            EV_DEBUG << "Backtrack found Tx: " << testTx << " with weight: " << self.ComputeWeight(testTx, simTime()) << std::endl;
-
+            t_ptrTx testTx = self.getWalkStart( actorTipView, par( "walkDepth" ) );
+            EV_DEBUG << "Backtrack found Tx: " << testTx << " with weight: " << self.ComputeWeight( testTx, simTime() ) << std::endl;
 
             /*
              * END OF WALK TIP SELECTION TEST CODE
              */
 
-            if( strcmp( par("tipSelectionMethod"), "URTS") == 0 ) {
+            if( strcmp( par( "tipSelectionMethod" ), "URTS" ) == 0 )
+            {
 
-                t_txApproved chosenTips = self.URTipSelection(actorTipView);
-                self.attach( actorTipView, simTime(), chosenTips, true);
+                t_txApproved chosenTips = self.URTipSelection( actorTipView );
+                self.attach( actorTipView, simTime(), chosenTips, true );
 
-            } else { //WALK
+            } else
+            { //WALK
 
                 t_txApproved chosenTips;
 
-                for(int i = 0; i < APPROVE_VAL; i++) {
+                for(int i = 0; i < APPROVE_VAL; i++)
+                {
                     //get start point for each walk
-                    t_ptrTx walkStart = self.getWalkStart( actorTipView, par("walkDepth") );
+                    t_ptrTx walkStart = self.getWalkStart( actorTipView, par( "walkDepth" ) );
 
                     //find a tip
-                    chosenTips[i] = self.WalkTipSelection( walkStart, par("walkAlphaValue"), actorTipView, tipTime );
+                    chosenTips[i] = self.WalkTipSelection( walkStart, par( "walkAlphaValue" ), actorTipView, tipTime );
                 }
+
                 bool kind = true;
-                if(powTime > 1) kind = false;
-                self.attach( actorTipView, tipTime, chosenTips, kind);
+                if( powTime > 1 ) kind = false;
+                self.attach( actorTipView, tipTime, chosenTips, kind );
+
             }
 
 
@@ -129,28 +137,30 @@ void TxActorModule::handleMessage(cMessage * msg) {
             EV_DEBUG << "Approved Tx #" << self.getMyTx().back()->m_TxApproved[0]->TxNumber << " and Tx #" << self.getMyTx().back()->m_TxApproved[1] << std::endl;
 
             //start a new issue timer
-            cMessage * timer = new cMessage("requestTimer");
-            scheduleAt(simTime() + par("txGenRate"), timer);
+            cMessage * timer = new cMessage( "requestTimer" );
+            scheduleAt( simTime() + par( "txGenRate" ), timer );
 
             //Inform tangle of attached Tx
-            cMessage * attachConfirm = new cMessage("attachConfirmed", ATTACH_CONFIRM);
+            cMessage * attachConfirm = new cMessage( "attachConfirmed", ATTACH_CONFIRM );
 
             //Tangle knows which tx was just attached from message context pointer
             attachConfirm->setContextPointer( self.getMyTx().back().get() );
-            send(attachConfirm, "tangleConnect$o");
+            send( attachConfirm, "tangleConnect$o" );
 
-            if(self.getMyTx().back()->TxNumber % 10 == 0) {
-                tracker.push_back(self.getMyTx().back());
+            if( self.getMyTx().back()->TxNumber % 10 == 0 )
+            {
+                tracker.push_back( self.getMyTx().back() );
             }
 
         }
 
-    } else { //TIP MESSAGE FROM TANGLE
+    } else
+    { //TIP MESSAGE FROM TANGLE
 
             // give the transactors a pointer to the tangle they're interacting with
-
-            if(self.getTanglePtr() == nullptr) {
-                self.setTanglePtr( (Tangle *) msg->getContextPointer() );
+            if( self.getTanglePtr() == nullptr )
+            {
+                self.setTanglePtr( ( Tangle *) msg->getContextPointer() );
             }
 
             //get copy of current tips
@@ -158,23 +168,29 @@ void TxActorModule::handleMessage(cMessage * msg) {
             tipTime = simTime();
 
             //start timer for when POW is completed
-            cMessage * powTimer = new cMessage("powTimer", POW_TIMER);
-            scheduleAt(simTime() + powTime, powTimer);
+            cMessage * powTimer = new cMessage( "powTimer", POW_TIMER );
+            scheduleAt( simTime() + powTime, powTimer );
 
             delete msg;
     }
+
 }
 
-void TangleModule::initialize() {
+void TangleModule::initialize()
+
+{
     tracker.clear();
     txCount = 0;
-    txLimit = par("transactionLimit");
+    txLimit = par( "transactionLimit" );
     Tx::tx_totalCount = 0;
+
 }
 
-void TangleModule::handleMessage(cMessage * msg) {
+void TangleModule::handleMessage( cMessage * msg )
+{
 
-    if( msg->getKind() == TIP_REQUEST ) {
+    if( msg->getKind() == TIP_REQUEST )
+    {
 
         int arrivalGateIndex = msg->getArrivalGate()->getIndex();
 
@@ -182,29 +198,36 @@ void TangleModule::handleMessage(cMessage * msg) {
         EV_DEBUG << "Total tips at time " << simTime() << ": " << tn.giveTips().size() << std::endl;
         txCount++;
 
-        cMessage * tipMessage = new cMessage("tipMessage");
+        cMessage * tipMessage = new cMessage( "tipMessage" );
 
         tipMessage->setContextPointer( &tn ); //so transactor can access Tangle methods
 
-        send(tipMessage, "actorConnect$o", arrivalGateIndex);
+        send( tipMessage, "actorConnect$o", arrivalGateIndex );
         delete msg;
 
-    } else if( msg->getKind() == ATTACH_CONFIRM ){
+    }
+    else if( msg->getKind() == ATTACH_CONFIRM )
+    {
 
-            Tx * justAttached = ( Tx* ) msg->getContextPointer();
+        Tx * justAttached = ( Tx* ) msg->getContextPointer();
 
-            if( justAttached->TxNumber >= txLimit ){
+        if( justAttached->TxNumber >= txLimit )
+        {
 
-                EV_DEBUG << "Transaction Limit reached, stopping simulation" << std::endl;
-                delete msg;
+            EV_DEBUG << "Transaction Limit reached, stopping simulation" << std::endl;
+            delete msg;
 
-                endSimulation();
+            endSimulation();
 
-            } else {
+        }
+        else
+        {
 
-                EV_DEBUG << "Total Transactions now: " << justAttached->TxNumber << std::endl;
-                delete msg;
-            }
+            EV_DEBUG << "Total Transactions now: " << justAttached->TxNumber << std::endl;
+            delete msg;
+
+        }
+
     }
 
 }
