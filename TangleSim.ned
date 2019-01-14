@@ -33,9 +33,6 @@ simple TangleModule
     parameters:
         @display("i=block/routing");
         int transactionLimit; // how many transactions to simulate before stopping
-		string dataFilename;
-		string tipAgeFilename;
-		string blockWeightFilename;
     gates:
         inout actorConnect[];
 }
