@@ -18,10 +18,10 @@ bool Tx::hasApprovees()
 {
     int approveeCount = 0;
 
-    for( int i = 0; i < APPROVE_VAL; i++ )
+    for( int i = 0; i < APPROVE_VAL; ++i )
     {
 
-        if( m_TxApproved[i] )
+        if( m_TxApproved.at( i ) )
         {
             approveeCount++;
         }
@@ -72,13 +72,13 @@ void Tangle::ReconcileTips( const t_txApproved& removeTips )
 {
 
 
-    for ( int i = 0; i < APPROVE_VAL; i++ )
+    for ( int i = 0; i < APPROVE_VAL; ++i )
     {
 
-        for ( int j = 0; j < m_tips.size(); j++ )
+        for ( int j = 0; j < m_tips.size(); ++j )
         {
 
-            if ( m_tips[j] == removeTips[i] )
+            if ( m_tips.at( j ) == removeTips.at( i ) )
             {
                 m_tips.erase( m_tips.begin() + j );
             }
@@ -123,7 +123,7 @@ std::vector<t_ptrTx>& Tangle::getTracker()
 
 //Constructor
 
-TxActor::TxActor() { actorCount++; }
+TxActor::TxActor() { ++actorCount; }
 
 //Tips to approve selected completely at random
 t_txApproved TxActor::URTipSelection( std::vector<t_ptrTx> tips )
@@ -133,13 +133,14 @@ t_txApproved TxActor::URTipSelection( std::vector<t_ptrTx> tips )
 
      int index;
 
-     for ( int i = 0; i < APPROVE_VAL; i++ )
+     for ( int i = 0; i < APPROVE_VAL; ++i )
      {
          if(tips.size() > 0)
          {
              std::uniform_int_distribution<int> tipDist( 0, tips.size() -1 );
              index = tipDist( getTanglePtr()->getRandGen() );
-             chosenTips[i] = tips[index];
+
+             chosenTips.at( i ) = tips.at( index );
              tips.erase( tips.begin() + index );
 
          }
@@ -159,43 +160,46 @@ void TxActor::attach( std::vector<t_ptrTx>& storedTips, omnetpp::simtime_t attac
          m_MyTx.back()->m_issuedBy = this;
          m_MyTx.back()->timeStamp = attachTime;
 
-         if( kind == false ) m_MyTx.back()->normalLatency = false;
+         if( kind == false )
+         {
+             m_MyTx.back()->normalLatency = false;
+         }
 
          //add pointer to new Tx to tips selected, so they know who approved them
-         for ( int i = 0; i < APPROVE_VAL; i++ )
+         for ( int i = 0; i < APPROVE_VAL; ++i )
          {
 
-             if( chosen[i].get() != nullptr )
-             { // if only one tip available (at start) will only be one actual tx approved - throws seg fault if not accounted for
+             if( chosen.at( i ) )
+             {
+                 // if only one tip available (at start) will only be one actual tx approved - throws seg fault if not accounted for
+                 chosen.at( i )->m_approvedBy.push_back( m_MyTx.back() );
 
-                 chosen[i]->m_approvedBy.push_back( m_MyTx.back() );
-
-                 if( !chosen[i]->isApproved )
+                 if( !chosen.at( i )->isApproved )
                  {
                      //with firstApprovedTime and timeAttached as field - we can compute the age of a transaction
-                     chosen[i]->firstApprovedTime = attachTime;
+                     chosen.at( i )->firstApprovedTime = attachTime;
                  }
 
-                 chosen[i]->isApproved = true;
+                 chosen.at( i )->isApproved = true;
              }
 
          }
 
-         for( int i =0; i < APPROVE_VAL; i++ )
+         for( int i = 0; i < APPROVE_VAL; ++i )
          {
              //approve tips
-             if( chosen[i] != nullptr )
+             if( chosen.at( i ) )
              {
-                 m_MyTx.back()->m_TxApproved[i] = chosen[i];
+                 m_MyTx.back()->m_TxApproved.at( i ) = chosen.at( i );
              }
 
          }
 
          //remove pointers to tips just approved, from tips vector in tangle
-         getTanglePtr()->ReconcileTips( chosen);
+         getTanglePtr()->ReconcileTips( chosen );
 
          //add newly created Tx to Tangle tips list
-         getTanglePtr()->addTip(m_MyTx.back());
+         getTanglePtr()->addTip( m_MyTx.back() );
 
      }
      catch ( std::bad_alloc& e )
@@ -229,15 +233,15 @@ int TxActor::ComputeWeight( t_ptrTx tx, omnetpp::simtime_t timeStamp )
 {
 
     std::vector<t_ptrTx> visited;
-    int weight = _computeWeight(visited, tx, timeStamp);
+    int weight = _computeWeight( visited, tx, timeStamp );
 
     //leave txes as we found them
-    for( int i = 0; i < visited.size(); i++ )
+    for( int i = 0; i < visited.size(); ++i )
     {
 
-        for( int j = 0; j < visited[i]->m_approvedBy.size(); j++ )
+        for( int j = 0; j < visited.at( i )->m_approvedBy.size(); ++j )
         {
-            visited[i]->m_approvedBy[j]->isVisited = false;
+            visited.at( i )->m_approvedBy.at( j )->isVisited = false;
         }
 
     }
@@ -265,6 +269,7 @@ int TxActor::_computeWeight( std::vector<t_ptrTx>& visited, t_ptrTx current, omn
     {
         visited.push_back( current );
         current->isVisited = true;
+
         return 0;
     }
 
@@ -273,13 +278,13 @@ int TxActor::_computeWeight( std::vector<t_ptrTx>& visited, t_ptrTx current, omn
     current->isVisited = true;
     int weight = 0;
 
-    for( int i = 0; i < current->m_approvedBy.size(); i++ )
+    for( int i = 0; i < current->m_approvedBy.size(); ++i )
     {
 
-        if( current->m_approvedBy[i]->isVisited == false )
+        if( !current->m_approvedBy.at( i )->isVisited )
         {
                 //check if next tx has been visited before
-                weight += 1 + _computeWeight( visited, current->m_approvedBy[i], timeStamp );
+                weight += 1 + _computeWeight( visited, current->m_approvedBy.at( i ), timeStamp );
         }
 
     }
@@ -293,7 +298,8 @@ t_ptrTx TxActor::getWalkStart( std::vector<t_ptrTx>& tips, int backTrackDist )
 
     std::uniform_int_distribution<int> tipDist( 0, tips.size() -1 );
     int index = tipDist( getTanglePtr()->getRandGen() );
-    t_ptrTx current = tips[index];
+
+    t_ptrTx current = tips.at( index );
 
     int count = backTrackDist;
     int approvesIndex;
@@ -308,14 +314,14 @@ t_ptrTx TxActor::getWalkStart( std::vector<t_ptrTx>& tips, int backTrackDist )
 
         if( !current->m_TxApproved[approvesIndex] )
         {
-            current = current->m_TxApproved[0];
+            current = current->m_TxApproved.at( 0 );
         }
         else
         {
-            current = current->m_TxApproved[approvesIndex];
+            current = current->m_TxApproved.at( approvesIndex );
         }
 
-        count--;
+        --count;
 
     }
 
@@ -329,53 +335,38 @@ t_ptrTx TxActor::WalkTipSelection( t_ptrTx start, double alphaVal, std::vector<t
     std::vector<t_ptrTx> currentView; //copy of each transactions approvers
 
     //both used to determine the next Tx to walk to
-    int maxWeight = 0;
-    int maxWeightIndex = 0;
     int walkCounts = 0;
 
     t_ptrTx current = start;
 
     //keep going until we reach a "tip" in relation to the view of the tangle that TxActor has
-    while( !isRelativeTip(current, tips) )
+    while( !isRelativeTip( current, tips ) )
     {
 
-        walkCounts++;
-        maxWeight = 0;
-        maxWeightIndex = 0;
+        ++walkCounts;
 
         std::vector<t_ptrTx> currentView = current->m_approvedBy;
 
         //filter current View
         filterView( currentView, timeStamp );
+
         if( currentView.size() == 0 )
         {
             break;
         }
 
         //if only one approver available dont compute the weight
-        if( currentView.size() == 1)
+        if( currentView.size() == 1 )
         {
-            current = currentView[0];
+            current = currentView.front();
 
         }
         else
         {
             //if more than one find the max weight
-
-            //find max weight of all available sites
-            for( int i = 0; i < currentView.size(); i++ )
-            {
-                int weight = ComputeWeight( currentView[i], timeStamp );
-
-                if( weight > maxWeight )
-                {
-                    maxWeightIndex = i;
-                }
-
-            }
-
             //get heaviest tx to simplify choosing next
-            t_ptrTx heaviestTx = currentView[maxWeightIndex];
+            int maxWeightIndex = findMaxWeightIndex( currentView, timeStamp );
+            t_ptrTx heaviestTx = currentView.at( maxWeightIndex );
 
             currentView.erase( currentView.begin() + maxWeightIndex );
 
@@ -400,7 +391,7 @@ t_ptrTx TxActor::WalkTipSelection( t_ptrTx start, double alphaVal, std::vector<t
                     if( currentView.size() == 1 )
                     {
                         //if only one left after removing heaviest use the remaining one
-                        current = currentView[0];
+                        current = currentView.front();
 
                     }
                     else
@@ -408,7 +399,7 @@ t_ptrTx TxActor::WalkTipSelection( t_ptrTx start, double alphaVal, std::vector<t
                         //otherwise pick at random
                         std::uniform_int_distribution<int> siteChoice( 0, currentView.size() - 1 );
                         int choiceIndex = siteChoice( getTanglePtr()->getRandGen() );
-                        current = currentView[choiceIndex];
+                        current = currentView.at( choiceIndex );
 
                     }
                 }
@@ -442,22 +433,42 @@ void TxActor::filterView( std::vector<t_ptrTx>& view, omnetpp::simtime_t timeSta
 {
 
     std::vector<int> removeIndexes;
-    for( int i = 0; i < view.size(); i++ )
+
+    for( int i = 0; i < view.size(); ++i )
     {
-        if( view[i]->timeStamp > timeStamp )
+        if( view.at( i )->timeStamp > timeStamp )
         {
-            removeIndexes.push_back(i);
+            removeIndexes.push_back( i );
         }
     }
 
     if( removeIndexes.size() > 0 )
     {
-        for( int i = removeIndexes.size() -1; i > -1; i-- )
+        for( int i = removeIndexes.size() -1; i > -1; --i )
         {
-            view.erase( view.begin() + removeIndexes[i] );
+            view.erase( view.begin() + removeIndexes.at( i ) );
         }
     }
 
+}
+
+int TxActor::findMaxWeightIndex(std::vector<t_ptrTx>& view, omnetpp::simtime_t timeStamp )
+{
+    int maxWeight = 0;
+    int maxWeightIndex = 0;
+
+    for( int i = 0; i < view.size(); ++i )
+    {
+        int weight = ComputeWeight( view.at( i ), timeStamp );
+
+        if( weight > maxWeight )
+        {
+            maxWeightIndex = i;
+        }
+
+    }
+
+    return maxWeightIndex;
 }
 
 //TxActor def END

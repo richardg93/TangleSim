@@ -102,7 +102,12 @@ class TxActor
 
         //checks if TxActor sees the tx its walker is on as a tip
         bool isRelativeTip( t_ptrTx toCheck, std::vector<t_ptrTx>& tips );
+
         void filterView( std::vector<t_ptrTx>& view, omnetpp::simtime_t timeStamp );
+
+        //Returns the index of the heaviest tx in the actors tip view
+       int findMaxWeightIndex(std::vector<t_ptrTx>& view, omnetpp::simtime_t timeStamp );
+
         static int actorCount;
 
 };
