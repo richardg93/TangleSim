@@ -111,13 +111,6 @@ const t_ptrTx& Tangle::giveGenBlock() const
     return m_genesisBlock;
 }
 
-//IGNORE FOR NOW
-//returs reference to transaction we are tracking
-std::vector<t_ptrTx>& Tangle::getTracker()
-{
-    return trackTx;
-}
-
 // Tangle def END
 
 /*

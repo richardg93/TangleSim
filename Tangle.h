@@ -43,8 +43,6 @@ class Tangle
     private:
         std::vector<t_ptrTx> m_tips;
         t_ptrTx m_genesisBlock;
-        //IGNORE holds pointers to transactions we want totrack the weights of during the simulation
-        std::vector<t_ptrTx> trackTx;
 
         //generator in Tangle as creating separate gen's for each actor that acted differently proved hard
         //i appreciate this entire simulation needs refactoring
