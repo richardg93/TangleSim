@@ -54,7 +54,7 @@ struct Tx
 
 class Tangle
 {
-    //TODO: Make singleton
+        //TODO: Make singleton
 
     private:
         // Keep a record of all the current unapproved transactions
