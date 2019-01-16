@@ -146,7 +146,7 @@ t_txApproved TxActor::URTipSelection( std::vector<t_ptrTx> tips )
 
 //creates a new transaction, selects tips for it to approve, then adds the new transaction to the tip list
 //ready for approval by the proceeding transactions
-void TxActor::attach( std::vector<t_ptrTx>& storedTips, omnetpp::simtime_t attachTime, t_txApproved& chosen, bool kind )
+void TxActor::attach( std::vector<t_ptrTx>& storedTips, omnetpp::simtime_t attachTime, t_txApproved& chosen )
 {
      try
      {
@@ -155,11 +155,6 @@ void TxActor::attach( std::vector<t_ptrTx>& storedTips, omnetpp::simtime_t attac
          m_MyTx.emplace_back( new Tx() );
          m_MyTx.back()->m_issuedBy = this;
          m_MyTx.back()->timeStamp = attachTime;
-
-         if( kind == false )
-         {
-             m_MyTx.back()->normalLatency = false;
-         }
 
          //add pointer to new Tx to tips selected, so they know who approved them
          for ( int i = 0; i < APPROVE_VAL; ++i )

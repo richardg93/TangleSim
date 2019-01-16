@@ -83,7 +83,7 @@ class TxActor
         std::shared_ptr<TxActor> getptr();
 
         t_txApproved URTipSelection( std::vector<t_ptrTx> tips );
-        void attach( std::vector<t_ptrTx>& storedTips, omnetpp::simtime_t attachTime, t_txApproved& chosen, bool kind );
+        void attach( std::vector<t_ptrTx>& storedTips, omnetpp::simtime_t attachTime, t_txApproved& chosen );
 
 
         //returns a tip to approve via a walk - randomness determined by param

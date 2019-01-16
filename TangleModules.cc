@@ -99,7 +99,7 @@ void TxActorModule::handleMessage(cMessage * msg)
             {
 
                 t_txApproved chosenTips = self.URTipSelection( actorTipView );
-                self.attach( actorTipView, simTime(), chosenTips, true );
+                self.attach( actorTipView, simTime(), chosenTips);
 
             } else
             { //WALK
@@ -116,9 +116,7 @@ void TxActorModule::handleMessage(cMessage * msg)
                     chosenTips[i] = self.WalkTipSelection( walkStart, par( "walkAlphaValue" ), actorTipView, tipTime );
                 }
 
-                bool kind = true;
-                if( powTime > 1 ) kind = false;
-                self.attach( actorTipView, tipTime, chosenTips, kind );
+                self.attach( actorTipView, tipTime, chosenTips );
 
             }
 
