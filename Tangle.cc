@@ -39,6 +39,9 @@ bool Tx::hasApprovees()
 
 }
 
+Tx::Tx() : TxNumber(tx_totalCount) { tx_totalCount++; }
+
+
 //Tx def END
 
 /*

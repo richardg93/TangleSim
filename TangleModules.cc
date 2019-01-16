@@ -95,17 +95,6 @@ void TxActorModule::handleMessage(cMessage * msg)
 
             EV_DEBUG << "Tips seen before starting POW: " << actorTipView.size() << std::endl;
 
-            /*
-             * WALK TIP SELECTION TESTING CODE
-             */
-
-            t_ptrTx testTx = self.getWalkStart( actorTipView, par( "walkDepth" ) );
-            EV_DEBUG << "Backtrack found Tx: " << testTx << " with weight: " << self.ComputeWeight( testTx, simTime() ) << std::endl;
-
-            /*
-             * END OF WALK TIP SELECTION TEST CODE
-             */
-
             if( strcmp( par( "tipSelectionMethod" ), "URTS" ) == 0 )
             {
 
@@ -121,6 +110,7 @@ void TxActorModule::handleMessage(cMessage * msg)
                 {
                     //get start point for each walk
                     t_ptrTx walkStart = self.getWalkStart( actorTipView, par( "walkDepth" ) );
+                    EV_DEBUG << "Backtrack:" << walkStart->TxNumber << " found Tx: " << walkStart << " with weight: " << self.ComputeWeight( walkStart, simTime() ) << std::endl;
 
                     //find a tip
                     chosenTips[i] = self.WalkTipSelection( walkStart, par( "walkAlphaValue" ), actorTipView, tipTime );

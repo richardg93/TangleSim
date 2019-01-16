@@ -33,6 +33,8 @@ struct Tx
 	long int TxNumber;
 	bool isVisited = false;
 	bool hasApprovees();
+
+	Tx();
 };
 
 class Tangle
