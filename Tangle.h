@@ -2,6 +2,8 @@
 #include <array>
 #include <vector>
 #include <memory>
+#include <map>
+
 #include <random>
 #include <ctime>
 #include <omnetpp.h>
@@ -58,7 +60,7 @@ class Tangle
 
     private:
         // Keep a record of all the current unapproved transactions
-        std::vector<t_ptrTx> m_tips;
+        std::map<int, t_ptrTx> m_tips;
 
         // The first transaction - initialised on construction
         t_ptrTx m_genesisBlock;
@@ -79,7 +81,7 @@ class Tangle
         std::vector<t_ptrTx> allTx;
 
         // Returns a copy of the current tips from the Tangle (Needs to be a copy to simulate an asynchronous view of the tangle per transactor)
-        std::vector<t_ptrTx> giveTips();
+        std::map<int, t_ptrTx> giveTips();
 
         // Compares the tips just approved ( removeTips ) with the tangles tip view, if it finds any references to the tips just approved
         // it will remove them from the tangle's view
@@ -109,25 +111,25 @@ class TxActor
 {
 
     private:
-        // All the transactions this transacotr has issued
+        // All the transactions this transactor has issued
         std::vector<t_ptrTx> m_MyTx;
         Tangle * tanglePtr = nullptr;
 
         // Recursive func to compute cumulative weight of a transaction, called from public func ComputeWeight
-        int _computeWeight( std::vector<t_ptrTx>& visited, t_ptrTx current, omnetpp::simtime_t timeStamp );
+        int _computeWeight( std::vector<t_ptrTx>& visited, t_ptrTx& current, omnetpp::simtime_t timeStamp );
 
     public:
         TxActor();
         // Tip selection method that picks uniformly between all the tips in the transactors view
-        t_txApproved URTipSelection( std::vector<t_ptrTx> tips );
+        t_txApproved URTipSelection( std::map<int, t_ptrTx>& tips );
 
         // Uses internal reference to Tangle object to approve transactions it has chosen via a tip selection methpod, then maks sure the Tangle
         // object is has a reference to has update it's tip view
         //TODO: Potential for a static method in a hitherto undefined Tangle namespace instead of a member
-        void attach( std::vector<t_ptrTx>& storedTips, omnetpp::simtime_t attachTime, t_txApproved& chosen );
+        void attach( std::map<int, t_ptrTx>& storedTips, omnetpp::simtime_t attachTime, t_txApproved& chosen );
 
         //returns a tip to approve via a walk - randomness determined by param
-        t_ptrTx WalkTipSelection( t_ptrTx start, double alphaVal, std::vector<t_ptrTx>& tips, omnetpp::simtime_t timeStamp );
+        t_ptrTx WalkTipSelection( t_ptrTx start, double alphaVal, std::map<int, t_ptrTx>& tips, omnetpp::simtime_t timeStamp );
 
         // Return the pointer to the Tangle object this transactor is referring to
         // see todo in Tangle
@@ -143,10 +145,10 @@ class TxActor
         int ComputeWeight( t_ptrTx tx, omnetpp::simtime_t timeStamp );
 
         //backtrack a determined distance in the tangle to find a start point for a random walk
-        t_ptrTx getWalkStart( std::vector<t_ptrTx>& tips, int backTrackDist );
+        t_ptrTx getWalkStart( std::map<int, t_ptrTx>& tips, int backTrackDist );
 
         //checks if TxActor sees the tx its walker is on as a tip
-        bool isRelativeTip( t_ptrTx toCheck, std::vector<t_ptrTx>& tips );
+        bool isRelativeTip( t_ptrTx& toCheck, std::map<int, t_ptrTx>& tips );
 
         void filterView( std::vector<t_ptrTx>& view, omnetpp::simtime_t timeStamp );
 

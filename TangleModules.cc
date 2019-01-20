@@ -31,7 +31,7 @@ protected:
     virtual void handleMessage( cMessage * msg ) override;
 
 public:
-    std::vector<t_ptrTx> actorTipView; // tips sent by tangle are stored by transactor till they can approve some
+    std::map<int, t_ptrTx> actorTipView; // tips sent by tangle are stored by transactor till they can approve some
     simtime_t tipTime; //time our tips view is from
 
 };
@@ -110,7 +110,7 @@ void TxActorModule::handleMessage(cMessage * msg)
                 {
                     //get start point for each walk
                     t_ptrTx walkStart = self.getWalkStart( actorTipView, par( "walkDepth" ) );
-                    EV_DEBUG << "Backtrack:" << walkStart->TxNumber << " found Tx: " << walkStart << " with weight: " << self.ComputeWeight( walkStart, simTime() ) << std::endl;
+                    EV_DEBUG << "Backtrack TX ID: " << walkStart->TxNumber << " found Tx: " << walkStart << " with weight: " << self.ComputeWeight( walkStart, simTime() ) << std::endl;
 
                     //find a tip
                     chosenTips[i] = self.WalkTipSelection( walkStart, par( "walkAlphaValue" ), actorTipView, tipTime );
@@ -186,7 +186,7 @@ void TangleModule::handleMessage( cMessage * msg )
         EV_DEBUG << "Total tips at time " << simTime() << ": " << tn.giveTips().size() << std::endl;
         txCount++;
 
-        cMessage * tipMessage = new cMessage( "tipMessage" );
+        cMessage* tipMessage = new cMessage( "tipMessage" );
 
         tipMessage->setContextPointer( &tn ); //so transactor can access Tangle methods
 
@@ -197,7 +197,7 @@ void TangleModule::handleMessage( cMessage * msg )
     else if( msg->getKind() == ATTACH_CONFIRM )
     {
 
-        Tx * justAttached = ( Tx* ) msg->getContextPointer();
+        Tx* justAttached = ( Tx* ) msg->getContextPointer();
 
         if( justAttached->TxNumber >= txLimit )
         {

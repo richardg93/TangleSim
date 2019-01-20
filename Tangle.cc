@@ -3,7 +3,7 @@
 #include <random>
 #include <chrono>
 #include <algorithm>
-
+#include <utility>
 
 int TxActor::actorCount;
 long int Tx::tx_totalCount;
@@ -50,7 +50,7 @@ Tx::Tx() : TxNumber(tx_totalCount) { tx_totalCount++; }
 
 Tangle::Tangle() try : m_genesisBlock( new Tx )
 {
-     m_tips.push_back( m_genesisBlock );
+     m_tips[m_genesisBlock->TxNumber] =  m_genesisBlock;
      unsigned tipSelectSeed;
      tipSelectSeed = std::chrono::system_clock::now().time_since_epoch().count(); //needs to use seeds from omnetpp
      tipSelectGen.seed( tipSelectSeed );
@@ -64,7 +64,7 @@ catch ( std::bad_alloc e)
 }
 
 //method to return a copy of all the current unconfirmed transactions
-std::vector<t_ptrTx> Tangle::giveTips()
+std::map<int, t_ptrTx> Tangle::giveTips()
 {
      return m_tips;
 }
@@ -78,21 +78,20 @@ void Tangle::ReconcileTips( const t_txApproved& removeTips )
     for ( int i = 0; i < APPROVE_VAL; ++i )
     {
 
-        for ( int j = 0; j < m_tips.size(); ++j )
-        {
+        auto it = m_tips.find( removeTips.at(i)->TxNumber );
 
-            if ( m_tips.at( j ) == removeTips.at( i ) )
-            {
-                m_tips.erase( m_tips.begin() + j );
-            }
+        if( it != m_tips.end() )
+        {
+            m_tips.erase( it );
         }
+
     }
 }
 
 //adds a pointer to a newly added but as yet unconfirmed Tx to the tip list
 void Tangle::addTip( t_ptrTx newTip )
 {
-     m_tips.push_back( newTip );
+     m_tips[newTip->TxNumber] = newTip;
      allTx.push_back( newTip );
 }
 
@@ -122,22 +121,23 @@ const t_ptrTx& Tangle::giveGenBlock() const
 TxActor::TxActor() { ++actorCount; }
 
 //Tips to approve selected completely at random
-t_txApproved TxActor::URTipSelection( std::vector<t_ptrTx> tips )
+t_txApproved TxActor::URTipSelection( std::map<int, t_ptrTx>& tips )
 {
-     // tips passed by value to allow a transaction a view of the Tangle as it started computing proof of work
-     t_txApproved chosenTips;
 
-     int index;
+     t_txApproved chosenTips;
 
      for ( int i = 0; i < APPROVE_VAL; ++i )
      {
          if(tips.size() > 0)
          {
              std::uniform_int_distribution<int> tipDist( 0, tips.size() -1 );
-             index = tipDist( getTanglePtr()->getRandGen() );
+             int iterAdvances = tipDist( getTanglePtr()->getRandGen() );
 
-             chosenTips.at( i ) = tips.at( index );
-             tips.erase( tips.begin() + index );
+             auto beginIter = tips.begin();
+             std::advance( beginIter, iterAdvances );
+
+             chosenTips.at( i ) = beginIter->second;
+             tips.erase( beginIter );
 
          }
      }
@@ -146,7 +146,7 @@ t_txApproved TxActor::URTipSelection( std::vector<t_ptrTx> tips )
 
 //creates a new transaction, selects tips for it to approve, then adds the new transaction to the tip list
 //ready for approval by the proceeding transactions
-void TxActor::attach( std::vector<t_ptrTx>& storedTips, omnetpp::simtime_t attachTime, t_txApproved& chosen )
+void TxActor::attach( std::map<int, t_ptrTx>& storedTips, omnetpp::simtime_t attachTime, t_txApproved& chosen )
 {
      try
      {
@@ -244,7 +244,7 @@ int TxActor::ComputeWeight( t_ptrTx tx, omnetpp::simtime_t timeStamp )
 
 //traverses tangle returns weight of each transaction, stopping cases: previously visited transaction, transaction with
 //a timestamp after TxActor started computing, and on reaching a tip
-int TxActor::_computeWeight( std::vector<t_ptrTx>& visited, t_ptrTx current, omnetpp::simtime_t timeStamp )
+int TxActor::_computeWeight( std::vector<t_ptrTx>& visited, t_ptrTx& current, omnetpp::simtime_t timeStamp )
 {
 
     //could TxActor "see" the current Tx their walk is located on?
@@ -284,13 +284,16 @@ int TxActor::_computeWeight( std::vector<t_ptrTx>& visited, t_ptrTx current, omn
 
 }
 
-t_ptrTx TxActor::getWalkStart( std::vector<t_ptrTx>& tips, int backTrackDist )
+t_ptrTx TxActor::getWalkStart( std::map<int, t_ptrTx>& tips, int backTrackDist )
 {
 
     std::uniform_int_distribution<int> tipDist( 0, tips.size() -1 );
-    int index = tipDist( getTanglePtr()->getRandGen() );
+    int iterAdvances = tipDist( getTanglePtr()->getRandGen() );
 
-    t_ptrTx current = tips.at( index );
+    auto beginIter = tips.begin();
+    std::advance( beginIter, iterAdvances );
+
+    t_ptrTx current = std::get<1>(*beginIter);
 
     int count = backTrackDist;
     int approvesIndex;
@@ -320,12 +323,10 @@ t_ptrTx TxActor::getWalkStart( std::vector<t_ptrTx>& tips, int backTrackDist )
 
 }
 
-t_ptrTx TxActor::WalkTipSelection( t_ptrTx start, double alphaVal, std::vector<t_ptrTx>& tips, omnetpp::simtime_t timeStamp )
+t_ptrTx TxActor::WalkTipSelection( t_ptrTx start, double alphaVal, std::map<int, t_ptrTx>& tips, omnetpp::simtime_t timeStamp )
 {
 
-    std::vector<t_ptrTx> currentView; //copy of each transactions approvers
-
-    //both used to determine the next Tx to walk to
+    // Used to determine the next Tx to walk to
     int walkCounts = 0;
 
     t_ptrTx current = start;
@@ -336,6 +337,7 @@ t_ptrTx TxActor::WalkTipSelection( t_ptrTx start, double alphaVal, std::vector<t
 
         ++walkCounts;
 
+        //copy of each transactions approvers
         std::vector<t_ptrTx> currentView = current->m_approvedBy;
 
         //filter current View
@@ -404,10 +406,10 @@ t_ptrTx TxActor::WalkTipSelection( t_ptrTx start, double alphaVal, std::vector<t
 
 }
 
-bool TxActor::isRelativeTip( t_ptrTx toCheck, std::vector<t_ptrTx>& tips )
+bool TxActor::isRelativeTip( t_ptrTx& toCheck, std::map<int, t_ptrTx>& tips )
 {
     // if tips is sorted when txactor receives it, we can improve performance as this is called alot during tip selection
-    std::vector<t_ptrTx>::iterator it = std::find( tips.begin(), tips.end(), toCheck );
+    auto it = tips.find( toCheck->TxNumber );
 
     if( it == tips.end() )
     {
