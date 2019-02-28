@@ -15,7 +15,7 @@ class TxActor;
 
 const unsigned int APPROVE_VAL = 2;
 
-using t_ptrTx = std::shared_ptr<Tx>;
+using t_ptrTx = Tx*;
 using t_txApproved = std::array<t_ptrTx, APPROVE_VAL>;
 
 struct Tx
@@ -130,6 +130,7 @@ class TxActor
 
         //returns a tip to approve via a walk - randomness determined by param
         t_ptrTx WalkTipSelection( t_ptrTx start, double alphaVal, std::map<int, t_ptrTx>& tips, omnetpp::simtime_t timeStamp );
+        t_ptrTx EasyWalkTipSelection( t_ptrTx start, double alphaVal, std::map<int, t_ptrTx>& tips, omnetpp::simtime_t timeStamp );
 
         // Return the pointer to the Tangle object this transactor is referring to
         // see todo in Tangle
