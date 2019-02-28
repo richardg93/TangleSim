@@ -306,7 +306,7 @@ t_ptrTx TxActor::getWalkStart( std::map<int, t_ptrTx>& tips, int backTrackDist )
         std::uniform_int_distribution<int> choice( 0, APPROVE_VAL -1 );
         approvesIndex = choice( getTanglePtr()->getRandGen() ) ;
 
-        if( !current->m_TxApproved[approvesIndex] )
+        if( !current->m_TxApproved.at( approvesIndex ) )
         {
             current = current->m_TxApproved.at( 0 );
         }
@@ -466,3 +466,64 @@ int TxActor::findMaxWeightIndex(std::vector<t_ptrTx>& view, omnetpp::simtime_t t
 
 //TxActor def END
 
+t_ptrTx TxActor::EasyWalkTipSelection( t_ptrTx start, double alphaVal, std::map<int, t_ptrTx>& tips, omnetpp::simtime_t timeStamp )
+{
+
+    // Used to determine the next Tx to walk to
+    int walkCounts = 0;
+
+    t_ptrTx current = start;
+
+    //keep going until we reach a "tip" in relation to the view of the tangle that TxActor has
+    while( !isRelativeTip( current, tips ) )
+    {
+
+        ++walkCounts;
+
+        //copy of each transactions approvers
+        std::vector<t_ptrTx> currentView = current->m_approvedBy;
+
+        //filter current View
+        filterView( currentView, timeStamp );
+
+        if( currentView.size() == 0 )
+        {
+            break;
+        }
+
+        //if only one approver available dont compute the weight
+        if( currentView.size() == 1 )
+        {
+            current = currentView.front();
+
+        }
+        else
+        {
+
+        // choose if calculate the weights of available transaction here
+        std::uniform_real_distribution<double> walkChoice( 0.0, 1.0 );
+
+            if( walkChoice( getTanglePtr()->getRandGen() ) < alphaVal)
+            {
+                //if more than one find the max weight
+                //get heaviest tx to simplify choosing next
+                int maxWeightIndex = findMaxWeightIndex( currentView, timeStamp );
+                current =  currentView.at( maxWeightIndex );
+
+
+            }
+            else
+            {
+
+                //otherwise pick at random
+                std::uniform_int_distribution<int> siteChoice( 0, currentView.size() - 1 );
+                int choiceIndex = siteChoice( getTanglePtr()->getRandGen() );
+                current = currentView.at( choiceIndex );
+
+            }
+        }
+    }
+
+    return current;
+
+}

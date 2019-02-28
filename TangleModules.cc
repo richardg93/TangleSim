@@ -113,7 +113,7 @@ void TxActorModule::handleMessage(cMessage * msg)
                     EV_DEBUG << "Backtrack TX ID: " << walkStart->TxNumber << " found Tx: " << walkStart << " with weight: " << self.ComputeWeight( walkStart, simTime() ) << std::endl;
 
                     //find a tip
-                    chosenTips[i] = self.WalkTipSelection( walkStart, par( "walkAlphaValue" ), actorTipView, tipTime );
+                    chosenTips[i] = self.EasyWalkTipSelection( walkStart, par( "walkAlphaValue" ), actorTipView, tipTime );
                 }
 
                 self.attach( actorTipView, tipTime, chosenTips );
@@ -132,7 +132,7 @@ void TxActorModule::handleMessage(cMessage * msg)
             cMessage * attachConfirm = new cMessage( "attachConfirmed", ATTACH_CONFIRM );
 
             //Tangle knows which tx was just attached from message context pointer
-            attachConfirm->setContextPointer( self.getMyTx().back().get() );
+            attachConfirm->setContextPointer( self.getMyTx().back() );
             send( attachConfirm, "tangleConnect$o" );
 
             if( self.getMyTx().back()->TxNumber % 10 == 0 )
@@ -204,6 +204,11 @@ void TangleModule::handleMessage( cMessage * msg )
 
             EV_DEBUG << "Transaction Limit reached, stopping simulation" << std::endl;
             delete msg;
+
+            for( auto tx : tn.allTx)
+            {
+                delete tx;
+            }
 
             endSimulation();
 
