@@ -100,6 +100,7 @@ class Tangle
         // Returns a reference to the first transaction
         const t_ptrTx& giveGenBlock() const;
 
+
         // Debug
         static int TangleGiveTipsCount;
 
@@ -121,7 +122,7 @@ class TxActor
     public:
         TxActor();
         // Tip selection method that picks uniformly between all the tips in the transactors view
-        t_txApproved URTipSelection( std::map<int, t_ptrTx>& tips );
+        t_txApproved URTipSelection( std::map<int, t_ptrTx> tips );
 
         // Uses internal reference to Tangle object to approve transactions it has chosen via a tip selection methpod, then maks sure the Tangle
         // object is has a reference to has update it's tip view

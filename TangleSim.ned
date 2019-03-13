@@ -18,7 +18,7 @@ simple TxActorModule
     
     parameters:
         volatile double txGenRate @unit( s ); // how often a transactor will issue a transaction
-        volatile double powTime @unit( s ) = default( 1s ); // time taken to compute proof of work to approve two transactions
+        volatile double powTime @unit( s ) = default( 0.1s ); // time taken to compute proof of work to approve two transactions
         
         //determines randomness of tip selection walk, higher is more deterministic, lower is more random
         double walkAlphaValue; // *******MUST BE BETWEEN 0 AND 1*********
@@ -26,6 +26,8 @@ simple TxActorModule
         
         //determines which tip selection + attach method to use ()
         string tipSelectionMethod;
+        
+        bool recordWeights = default(true);
         
     gates:
         inout tangleConnect;
@@ -39,6 +41,10 @@ simple TangleModule
         @display( "i=block/routing" );
         int transactionLimit; // how many transactions to simulate before stopping
         
+        string tipDataFilename = default( "Data\\ex\\GeneraTipData.txt" );
+		string tipAgeFilename = default( "Data\\ex\\TipAge.txt" );
+		string blockWeightFilename = default( "Data\\ex\\BlockWeight.txt" );
+		
     gates:
         inout actorConnect[];
         
@@ -57,7 +63,7 @@ network TangleSim
     connections:
         for i=0..txActorNumber -1 
         {
-            actors[i].tangleConnect <--> {  delay = 100ms; } <--> tangle.actorConnect++;
+            actors[i].tangleConnect <--> {  delay = 1ms; } <--> tangle.actorConnect++;
         }
 
 }

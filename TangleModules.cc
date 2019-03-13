@@ -3,11 +3,21 @@
 #include <omnetpp.h>
 #include "Tangle.h"
 #include <fstream>
+#include <sstream>
 
 using namespace omnetpp;
 
 enum MessageType { NEXT_TX_TIMER, POW_TIMER, TIP_REQUEST, ATTACH_CONFIRM };
 
+std::ofstream tipData;
+std::ofstream blockWeightData;
+std::ofstream tipAgeData;
+
+std::stringstream tipDataStream;
+std::stringstream tipAgeDataStream;
+
+// store pointers here to limit reallocation / copying
+std::vector<std::stringstream*> blockWeightDataStreams;
 
 std::vector<t_ptrTx> tracker;
 
@@ -91,7 +101,6 @@ void TxActorModule::handleMessage(cMessage * msg)
             EV_DEBUG << "TxActor " << getId() << ": POW completed, approving tips" << std::endl;
             issueCount++;
             delete msg;
-            //store number of tips seen by transaction before and add to confirmation message
 
             EV_DEBUG << "Tips seen before starting POW: " << actorTipView.size() << std::endl;
 
@@ -99,7 +108,7 @@ void TxActorModule::handleMessage(cMessage * msg)
             {
 
                 t_txApproved chosenTips = self.URTipSelection( actorTipView );
-                self.attach( actorTipView, simTime(), chosenTips);
+                self.attach( actorTipView, tipTime, chosenTips);
 
             } else
             { //WALK
@@ -135,9 +144,51 @@ void TxActorModule::handleMessage(cMessage * msg)
             attachConfirm->setContextPointer( self.getMyTx().back() );
             send( attachConfirm, "tangleConnect$o" );
 
-            if( self.getMyTx().back()->TxNumber % 10 == 0 )
+            //log data for new tx in .txt file
+            std::string data;
+            data.reserve(100);
+
+            //tx Number
+            data.append(std::to_string(self.getMyTx().back()->TxNumber));
+            data.push_back(',');
+
+            //tip count before
+            data.append( std::to_string(actorTipView.size()) );
+            data.push_back(',');
+
+            //tip count after
+            data.append( std::to_string(self.getTanglePtr()->getTipNumber()) );
+            data.push_back('\n');
+
+            data.shrink_to_fit();
+            tipDataStream << data;
+
+            if( par("recordWeights") )
             {
-                tracker.push_back( self.getMyTx().back() );
+                // Track 5% of transactions
+                if( self.getMyTx().back()->TxNumber % 10 == 0 )
+                {
+                    tracker.push_back( self.getMyTx().back() );
+                }
+
+                //append weights of transactions to data file to track how they change
+                if( self.getMyTx().back()->TxNumber % 100 == 0 )
+                {
+
+
+                    if( tracker.size() != 0 )
+                    {
+                        std::stringstream* pCurrentBlockweightStream = new std::stringstream();
+                        for( int i = 0; i < tracker.size(); i++ )
+                        {
+
+                            (*pCurrentBlockweightStream) << tracker[i]->TxNumber << "," << self.ComputeWeight( tracker[i], simTime() ) << std::endl;
+
+                        }
+
+                        blockWeightDataStreams.push_back( pCurrentBlockweightStream );
+                    }
+                }
             }
 
         }
@@ -172,6 +223,18 @@ void TangleModule::initialize()
     txLimit = par( "transactionLimit" );
     Tx::tx_totalCount = 0;
 
+    std::string filename = par("tipDataFilename");
+    tipData.open(filename.c_str(), std::ios::app);
+    tipData << "TxNumber," << "Tips seen," << "Tips after" << std::endl;
+
+    std::string filename2 = par("tipAgeFilename");
+    tipAgeData.open(filename2.c_str(), std::ios::app);
+    tipAgeData << "TxNumber," << "Tip Age," << "First Approval Time," << "Attach Time," << "Direct Approvers" << std::endl;
+
+    std::string filename3 = par("blockWeightFilename");
+    blockWeightData.open(filename3.c_str(), std::ios::app);
+    blockWeightData << "TxNumber," << "Weight" << std::endl;
+
 }
 
 void TangleModule::handleMessage( cMessage * msg )
@@ -205,10 +268,55 @@ void TangleModule::handleMessage( cMessage * msg )
             EV_DEBUG << "Transaction Limit reached, stopping simulation" << std::endl;
             delete msg;
 
+            // write out data files before cleaning up
+
+            //record time from attach to first approval
+            double tipAge;
+
+            for(int i = 0; i < tn.allTx.size(); i++)
+            {
+                tipAge = tn.allTx[i]->firstApprovedTime.dbl() - tn.allTx[i]->timeStamp.dbl();
+                tipAgeDataStream << tn.allTx[i]->TxNumber << "," << tipAge << "," << tn.allTx[i]->firstApprovedTime.dbl() << "," << tn.allTx[i]->timeStamp.dbl() << "," << tn.allTx[i]->m_approvedBy.size() << std::endl;
+            }
+
+            // Write out the data in one go
+            tipAgeData << tipAgeDataStream.str();
+            tipData << tipDataStream.str();
+
+            if( blockWeightDataStreams.size() > 0 )
+            {
+                for(auto& pStream : blockWeightDataStreams )
+                {
+                    blockWeightData << (*pStream).str();
+                }
+            }
+
+            // Clean up for next run
+            tipDataStream.str("");
+            tipDataStream.clear();
+
+            tipAgeDataStream.str("");
+            tipAgeDataStream.clear();
+
             for( auto tx : tn.allTx)
             {
                 delete tx;
             }
+
+            if( blockWeightDataStreams.size() > 0 )
+            {
+                for(auto ptr : blockWeightDataStreams )
+                {
+                    delete ptr;
+                }
+            }
+
+            blockWeightDataStreams.clear();
+
+            tipData.close();
+            blockWeightData.close();
+            tipAgeData.close();
+
 
             endSimulation();
 

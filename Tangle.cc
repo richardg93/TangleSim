@@ -78,11 +78,14 @@ void Tangle::ReconcileTips( const t_txApproved& removeTips )
     for ( int i = 0; i < APPROVE_VAL; ++i )
     {
 
-        auto it = m_tips.find( removeTips.at(i)->TxNumber );
-
-        if( it != m_tips.end() )
+        if( removeTips.at(i) )
         {
-            m_tips.erase( it );
+            auto it = m_tips.find( removeTips.at(i)->TxNumber );
+
+            if( it != m_tips.end() )
+            {
+                m_tips.erase( it );
+            }
         }
 
     }
@@ -110,6 +113,7 @@ const t_ptrTx& Tangle::giveGenBlock() const
     return m_genesisBlock;
 }
 
+
 // Tangle def END
 
 /*
@@ -121,7 +125,7 @@ const t_ptrTx& Tangle::giveGenBlock() const
 TxActor::TxActor() { ++actorCount; }
 
 //Tips to approve selected completely at random
-t_txApproved TxActor::URTipSelection( std::map<int, t_ptrTx>& tips )
+t_txApproved TxActor::URTipSelection( std::map<int, t_ptrTx> tips )
 {
 
      t_txApproved chosenTips;
@@ -138,6 +142,16 @@ t_txApproved TxActor::URTipSelection( std::map<int, t_ptrTx>& tips )
 
              chosenTips.at( i ) = beginIter->second;
              tips.erase( beginIter );
+
+             if( tips.size() == 0 )
+             {
+                 if(i + 1 != APPROVE_VAL)
+                 {
+                     chosenTips.at( i + 1 ) = NULL;
+                 }
+
+                 break;
+             }
 
          }
      }
