@@ -4,6 +4,7 @@
 #include <chrono>
 #include <algorithm>
 #include <utility>
+#include <functional>
 
 int TxActor::actorCount;
 long int Tx::tx_totalCount;
@@ -16,30 +17,13 @@ int Tangle::TangleGiveTipsCount;
 //return true if Tx has approved at least one other transactions
 bool Tx::hasApprovees()
 {
-    int approveeCount = 0;
-
-    for( int i = 0; i < APPROVE_VAL; ++i )
-    {
-
-        if( m_TxApproved.at( i ) )
-        {
-            approveeCount++;
-        }
-
-    }
-
-    if( approveeCount > 0 )
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-
+    return m_TxApproved.size() > 0;
 }
 
-Tx::Tx() : TxNumber(tx_totalCount) { tx_totalCount++; }
+Tx::Tx() : m_walkBacktracks(0), TxNumber(tx_totalCount)
+{
+    tx_totalCount++;
+}
 
 
 //Tx def END
@@ -74,21 +58,17 @@ std::map<int, t_ptrTx> Tangle::giveTips()
 void Tangle::ReconcileTips( const t_txApproved& removeTips )
 {
 
-
-    for ( int i = 0; i < APPROVE_VAL; ++i )
+    for(auto& tipSelected : removeTips)
     {
 
-        if( removeTips.at(i) )
+        auto it = m_tips.find( tipSelected->TxNumber );
+
+        if( it != m_tips.end() )
         {
-            auto it = m_tips.find( removeTips.at(i)->TxNumber );
-
-            if( it != m_tips.end() )
-            {
-                m_tips.erase( it );
-            }
+            m_tips.erase( it );
         }
-
     }
+
 }
 
 //adds a pointer to a newly added but as yet unconfirmed Tx to the tip list
@@ -137,24 +117,23 @@ t_txApproved TxActor::URTipSelection( std::map<int, t_ptrTx> tips )
              std::uniform_int_distribution<int> tipDist( 0, tips.size() -1 );
              int iterAdvances = tipDist( getTanglePtr()->getRandGen() );
 
+             assert(iterAdvances < tips.size());
+
              auto beginIter = tips.begin();
              std::advance( beginIter, iterAdvances );
 
-             chosenTips.at( i ) = beginIter->second;
+             chosenTips.push_back( beginIter->second );
              tips.erase( beginIter );
 
              if( tips.size() == 0 )
              {
-                 if(i + 1 != APPROVE_VAL)
-                 {
-                     chosenTips.at( i + 1 ) = NULL;
-                 }
-
                  break;
              }
 
          }
      }
+
+     chosenTips.erase( std::unique( chosenTips.begin(), chosenTips.end() ), chosenTips.end() ) ;
      return chosenTips;
 }
 
@@ -170,35 +149,23 @@ void TxActor::attach( std::map<int, t_ptrTx>& storedTips, omnetpp::simtime_t att
          m_MyTx.back()->m_issuedBy = this;
          m_MyTx.back()->timeStamp = attachTime;
 
+
          //add pointer to new Tx to tips selected, so they know who approved them
-         for ( int i = 0; i < APPROVE_VAL; ++i )
+         for ( auto& tipSelected : chosen )
          {
 
-             if( chosen.at( i ) )
+             tipSelected->m_approvedBy.push_back( m_MyTx.back() );
+
+             if( !( tipSelected->isApproved ) )
              {
-                 // if only one tip available (at start) will only be one actual tx approved - throws seg fault if not accounted for
-                 chosen.at( i )->m_approvedBy.push_back( m_MyTx.back() );
-
-                 if( !chosen.at( i )->isApproved )
-                 {
-                     //with firstApprovedTime and timeAttached as field - we can compute the age of a transaction
-                     chosen.at( i )->firstApprovedTime = attachTime;
-                 }
-
-                 chosen.at( i )->isApproved = true;
+                 //with firstApprovedTime and timeAttached as field - we can compute the age of a transaction
+                 tipSelected->firstApprovedTime = attachTime;
+                 tipSelected->isApproved = true;
              }
 
          }
 
-         for( int i = 0; i < APPROVE_VAL; ++i )
-         {
-             //approve tips
-             if( chosen.at( i ) )
-             {
-                 m_MyTx.back()->m_TxApproved.at( i ) = chosen.at( i );
-             }
-
-         }
+         m_MyTx.back()->m_TxApproved = chosen;
 
          //remove pointers to tips just approved, from tips vector in tangle
          getTanglePtr()->ReconcileTips( chosen );
@@ -304,10 +271,16 @@ t_ptrTx TxActor::getWalkStart( std::map<int, t_ptrTx>& tips, int backTrackDist )
     std::uniform_int_distribution<int> tipDist( 0, tips.size() -1 );
     int iterAdvances = tipDist( getTanglePtr()->getRandGen() );
 
-    auto beginIter = tips.begin();
-    std::advance( beginIter, iterAdvances );
+    assert( iterAdvances < tips.size() );
 
-    t_ptrTx current = std::get<1>(*beginIter);
+    auto beginIter = tips.begin();
+
+    if(tips.size() > 1)
+    {
+        std::advance( beginIter, iterAdvances );
+    }
+
+    t_ptrTx current = beginIter->second;
 
     int count = backTrackDist;
     int approvesIndex;
@@ -317,17 +290,13 @@ t_ptrTx TxActor::getWalkStart( std::map<int, t_ptrTx>& tips, int backTrackDist )
     while( !current->isGenesisBlock && count > 0 )
     {
 
-        std::uniform_int_distribution<int> choice( 0, APPROVE_VAL -1 );
+        std::uniform_int_distribution<int> choice( 0, current->m_TxApproved.size() -1 );
         approvesIndex = choice( getTanglePtr()->getRandGen() ) ;
 
-        if( !current->m_TxApproved.at( approvesIndex ) )
-        {
-            current = current->m_TxApproved.at( 0 );
-        }
-        else
-        {
-            current = current->m_TxApproved.at( approvesIndex );
-        }
+        assert( approvesIndex < current->m_TxApproved.size() );
+
+        current = current->m_TxApproved.at( approvesIndex );
+
 
         --count;
 
@@ -538,6 +507,45 @@ t_ptrTx TxActor::EasyWalkTipSelection( t_ptrTx start, double alphaVal, std::map<
         }
     }
 
+    current->m_walkBacktracks = walkCounts;
+
     return current;
 
 }
+
+// Allows us to use walk tip selection with multiple walkers
+t_txApproved TxActor::NKWalkTipSelection( double alphaVal, std::map<int, t_ptrTx>& tips, omnetpp::simtime_t timeStamp, int kMultiplier, int backTrackDist)
+{
+    // Walkers sent == 3 * k + 4
+    int walkers = kMultiplier * APPROVE_VAL + 4;
+
+    std::vector<t_ptrTx> vec_walkerResults;
+    vec_walkerResults.reserve(walkers);
+
+    // Let the walkers find the tips tips
+    for( int i = 0; i < walkers; ++i )
+    {
+        vec_walkerResults.push_back( EasyWalkTipSelection( getWalkStart( tips, backTrackDist ) , alphaVal, tips, timeStamp ) );
+    }
+
+    // Sort tips by how many steps the walker made - ascending order
+    std::sort( vec_walkerResults.begin(), vec_walkerResults.end(), [] ( t_ptrTx left, t_ptrTx right )
+        {
+            return left->m_walkBacktracks > right->m_walkBacktracks;
+        }
+    );
+
+    // Dedupe so we dont approve the same tip more than once
+    vec_walkerResults.erase( std::unique( vec_walkerResults.begin(), vec_walkerResults.end() ), vec_walkerResults.end() ) ;
+
+    assert( vec_walkerResults.size() > 0 );
+
+    int tipSelectedSize =  APPROVE_VAL > vec_walkerResults.size() ? vec_walkerResults.size() : APPROVE_VAL ;
+
+    t_txApproved retVal(vec_walkerResults.begin(), vec_walkerResults.begin() + tipSelectedSize );
+
+
+    return retVal;
+}
+
+

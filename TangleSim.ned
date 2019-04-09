@@ -29,6 +29,9 @@ simple TxActorModule
         
         bool recordWeights = default(true);
         
+        // Denotes how many walkers we use in WALK, k being the number of tips selected per attach
+        int k_Multiplier;
+        
     gates:
         inout tangleConnect;
         

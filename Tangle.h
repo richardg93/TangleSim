@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <utility>
 
 #include <random>
 #include <ctime>
@@ -16,7 +17,7 @@ class TxActor;
 const unsigned int APPROVE_VAL = 2;
 
 using t_ptrTx = Tx*;
-using t_txApproved = std::array<t_ptrTx, APPROVE_VAL>;
+using t_txApproved = std::vector<t_ptrTx>;
 
 struct Tx
 {
@@ -34,6 +35,8 @@ struct Tx
 
 	//Time this transaction ceased to be a tip
 	omnetpp::simtime_t firstApprovedTime;
+
+	int m_walkBacktracks;
 
 	bool isGenesisBlock = false;
 	bool isApproved = false;
@@ -133,6 +136,10 @@ class TxActor
         t_ptrTx WalkTipSelection( t_ptrTx start, double alphaVal, std::map<int, t_ptrTx>& tips, omnetpp::simtime_t timeStamp );
         t_ptrTx EasyWalkTipSelection( t_ptrTx start, double alphaVal, std::map<int, t_ptrTx>& tips, omnetpp::simtime_t timeStamp );
 
+        //Wrapper for Walk tip selection where k is the number of walkers to release into the tangle
+        // first APPROVE_VAL back are the chosen tips
+        t_txApproved NKWalkTipSelection( double alphaVal, std::map<int, t_ptrTx>& tips, omnetpp::simtime_t timeStamp, int kMultiplier, int backTrackDist);
+
         // Return the pointer to the Tangle object this transactor is referring to
         // see todo in Tangle
         Tangle* getTanglePtr() const;
@@ -155,7 +162,7 @@ class TxActor
         void filterView( std::vector<t_ptrTx>& view, omnetpp::simtime_t timeStamp );
 
         //Returns the index of the heaviest tx in the actors tip view
-        int findMaxWeightIndex(std::vector<t_ptrTx>& view, omnetpp::simtime_t timeStamp );
+        int findMaxWeightIndex( std::vector<t_ptrTx>& view, omnetpp::simtime_t timeStamp );
 
         static int actorCount;
 

@@ -110,28 +110,37 @@ void TxActorModule::handleMessage(cMessage * msg)
                 t_txApproved chosenTips = self.URTipSelection( actorTipView );
                 self.attach( actorTipView, tipTime, chosenTips);
 
-            } else
+            }
+            else if ( strcmp( par( "tipSelectionMethod" ), "WALK" ) == 0  )
             { //WALK
 
                 t_txApproved chosenTips;
 
-                for(int i = 0; i < APPROVE_VAL; i++)
+                for(int i = 0; i < APPROVE_VAL; ++i)
                 {
                     //get start point for each walk
                     t_ptrTx walkStart = self.getWalkStart( actorTipView, par( "walkDepth" ) );
                     EV_DEBUG << "Backtrack TX ID: " << walkStart->TxNumber << " found Tx: " << walkStart << " with weight: " << self.ComputeWeight( walkStart, simTime() ) << std::endl;
 
                     //find a tip
-                    chosenTips[i] = self.EasyWalkTipSelection( walkStart, par( "walkAlphaValue" ), actorTipView, tipTime );
+                    chosenTips.push_back( self.EasyWalkTipSelection( walkStart, par( "walkAlphaValue" ), actorTipView, tipTime ) );
                 }
 
                 self.attach( actorTipView, tipTime, chosenTips );
-
+            }
+            else // KWALK
+            {
+                t_txApproved chosenTips = self.NKWalkTipSelection( par( "walkAlphaValue" ), actorTipView, tipTime, par( "k_Multiplier" ), par( "walkDepth" ) );
+                self.attach( actorTipView, tipTime, chosenTips );
             }
 
 
             EV_DEBUG << "Actual tips after: " << self.getTanglePtr()->giveTips().size() << std::endl;
-            EV_DEBUG << "Approved Tx #" << self.getMyTx().back()->m_TxApproved[0]->TxNumber << " and Tx #" << self.getMyTx().back()->m_TxApproved[1] << std::endl;
+
+            for( auto& tipSelected : self.getMyTx().back()->m_TxApproved )
+            {
+                EV_DEBUG << "Approved Tx #" << tipSelected->TxNumber << std::endl;
+            }
 
             //start a new issue timer
             cMessage * timer = new cMessage( "requestTimer" );
@@ -165,7 +174,7 @@ void TxActorModule::handleMessage(cMessage * msg)
 
             if( par("recordWeights") )
             {
-                // Track 5% of transactions
+                // Track 10% of transactions
                 if( self.getMyTx().back()->TxNumber % 10 == 0 )
                 {
                     tracker.push_back( self.getMyTx().back() );
@@ -242,7 +251,7 @@ void TangleModule::handleMessage( cMessage * msg )
 
     if( msg->getKind() == TIP_REQUEST )
     {
-
+        try {
         int arrivalGateIndex = msg->getArrivalGate()->getIndex();
 
         EV_DEBUG << "Tip request from TxActor " << msg->getSenderModuleId() << std::endl;
@@ -255,7 +264,11 @@ void TangleModule::handleMessage( cMessage * msg )
 
         send( tipMessage, "actorConnect$o", arrivalGateIndex );
         delete msg;
+        }
+        catch(...)
+        {
 
+        }
     }
     else if( msg->getKind() == ATTACH_CONFIRM )
     {
