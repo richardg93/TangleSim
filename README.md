@@ -11,4 +11,4 @@ The omnet++ and pure c++ classes are separate yet fairly intertwined. The omnet+
 
 It is possible to use the pure c++ classes with another event simulator/framework, but as time has gone on, in this version they are more intertwined than ever.
 
-Feel free to drop me a message if you want to contribute/branch/pull etc, or more likely if you want to know how the hell it works - happy to help either way.
+Feel free to drop me a message if you want to contribute/branch/pull etc, or more likely if you want to know how it works - happy to help either way.
