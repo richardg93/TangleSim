@@ -1,6 +1,8 @@
 # TangleSim
 Omnet++ simulation of a directed acyclic graph
 
+**Note the bulk of the implementation was written in 2018 when I had zero commercial software engineering experience so should be viewed as such.**
+
 This a simulation model that can be used to simulate a network of individual nodes, issuing transactions to construct (via various tip selection methods) a Tangle.
 
 The Tangle is a Directed Acyclic Graph (DAG) which is not a novel structure. However, using a DAG where nodes are individual transactions is a novel use, and introduced to us by the IOTA foundation, see: https://www.iota.org/research/academic-papers .
